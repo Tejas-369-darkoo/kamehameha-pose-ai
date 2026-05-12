@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KamehameHa! ⚡ Dragon Ball Z Pose Attack</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: radial-gradient(ellipse at center, #0a0a2e 0%, #000000 70%);
+            color: #00ffff;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+            cursor: none;
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #videoContainer {
+            position: relative;
+            width: 90vmin;
+            height: 90vmin;
+            max-width: 800px;
+            max-height: 600px;
+            border: 3px solid #00ffff;
+            border-radius: 20px;
+            box-shadow: 
+                0 0 50px #00ffff,
+                inset 0 0 50px rgba(0, 255, 255, 0.1);
+            overflow: hidden;
+            background: radial-gradient(circle, rgba(0,0,0,0.8) 0%, transparent 70%);
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            filter: hue-rotate(200deg) contrast(1.2) brightness(1.1);
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .energy-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            border-radius: 20px;
+        }
+
+        #chargeEffect {
+            background: radial-gradient(circle, 
+                rgba(0, 255, 255, 0.8) 0%, 
+                rgba(255, 0, 255, 0.6) 30%, 
+                rgba(255, 255, 0, 0.4) 60%, 
+                transparent 80%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        #beamEffect {
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(0, 255, 255, 0.9) 20%,
+                rgba(0, 200, 255, 1) 40%,
+                rgba(255, 0, 255, 1) 50%,
+                rgba(255, 100, 255, 1) 60%,
+                rgba(255, 255, 0, 0.9) 80%,
+                transparent 100%);
+            opacity: 0;
+            transform: scaleX(0);
+            transform-origin: left center;
+            transition: all 0.1s ease-out;
+        }
+
+        #auraEffect {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle,
+                rgba(0, 255, 0, 0.6) 0%,
+                rgba(255, 0, 0, 0.4) 50%,
+                transparent 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) scale(0);
+            opacity: 0;
+            filter: blur(20px);
+            animation: auraPulse 1s infinite;
+        }
+
+        @keyframes auraPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(0) opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.5) opacity: 0.5; }
+        }
+
+        .ui-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid #00ffff;
+            border-radius: 15px;
+            padding: 20px;
+            font-size: 1.2em;
+            font-weight: 700;
+            text-shadow: 0 0 10px #00ffff;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+        }
+
+        #powerUI {
+            top: 20px;
+            left: 20px;
+            min-width: 200px;
+        }
+
+        #instructions {
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        #status {
+            top: 20px;
+            right: 20px;
+            text-align: center;
+        }
+
+        .power-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .power-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #ffff00, #ff0000);
+            width: 0%;
+            transition: width 0.2s ease;
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .glow {
+            animation: glow 0.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 10px #00ffff); }
+            to { filter: drop-shadow(0 0 30px #00ffff); }
+        }
+
+        .explosion {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            background: radial-gradient(circle, #ffff00 0%, #ff6600 50%, transparent 70%);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: scale(0);
+        }
+
+        .ready {
+            color: #00ff00 !important;
+            text-shadow: 0 0 15px #00ff00 !important;
+        }
+
+        .charging {
+            color: #ffff00 !important;
+            text-shadow: 0 0 15px #ffff00 !important;
+        }
+
+        .firing {
+            color: #ff0000 !important;
+            text-shadow: 0 0 20px #ff0000 !important;
+        }
+
+        @media (max-width: 768px) {
+            .ui-panel {
+                font-size: 1em;
+                padding: 15px;
+            }
+            #videoContainer {
+                width: 95vw;
+                height: 70vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="videoContainer">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            <div id="chargeEffect" class="energy-overlay"></div>
+            <div id="beamEffect" class="energy-overlay"></div>
+            <div id="auraEffect"></div>
+        </div>
+
+        <div id="powerUI" class="ui-panel">
+            <div>⚡ POWER LEVEL</div>
+            <div class="power-bar">
+                <div id="powerFill" class="power-fill"></div>
+            </div>
+            <div id="powerText">0%</div>
+        </div>
+
+        <div id="status" class="ui-panel">
+            <div id="statusText">Ready to charge...</div>
+        </div>
+
+        <div id="instructions" class="ui-panel">
+            <div>👐 Hands together → 💪 Palms forward → Hold → FIRE! 🔥</div>
+        </div>
+    </div>
+
+    <!-- Sound Effects (Embedded Base64 Audio) -->
+    <audio id="chargeSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBS/9vT6v2gBAy8RAAABAQAAAHAA8ABgA=" type="audio/wav">
+    </audio>
+    <audio id="fireSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRp4CAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBS/9vT6v2gBAy8RAAABAQAAAHAA8ABgA=" type="audio/wav">
+    </audio>
+    <audio id="explosionSound" preload="auto">
+        <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBS/9vT6v2gBAy8RAAABAQAAAHAA8ABgA=" type="audio/wav">
+    </audio>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const powerFill = document.getElementById('powerFill');
+        const powerText = document.getElementById('powerText');
+        const statusText = document.getElementById('statusText');
+        const chargeEffect = document.getElementById('chargeEffect');
+        const beamEffect = document.getElementById('beamEffect');
+        const auraEffect = document.getElementById('auraEffect');
+        
+        const chargeSound = document.getElementById('chargeSound');
+        const fireSound = document.getElementById('fireSound');
+        const explosionSound = document.getElementById('explosionSound');
+
+        let pose;
+        let camera;
+        let powerLevel = 0;
+        let isCharging = false;
+        let isFiring = false;
+        let chargeStartTime = 0;
+        let landmarks = null;
+
+        // Pose detection configuration
+        const poseConfig = {
+            locateFile: (file) => {
+                return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+            }
+        };
+
+        pose = new Pose(poseConfig);
+        pose.setOptions({
+            modelComplexity: 1,
+            smoothLandmarks: true,
+            enableSegmentation: false,
+            smoothSegmentation: true,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
+        });
+
+        pose.onResults(onPoseResults);
+
+        async function initCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: 1280,
+                    height: 720,
+                    facingMode: 'user'
+                }
+            });
+            camera = new Camera(video, {
+                onFrame: async () => {
+                    await pose.send({image: video});
+                },
+                width: 1280,
+                height: 720
+            });
+            camera.start();
+        }
+
+        function onPoseResults(results) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            ctx.save();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(-1, 1); // Mirror effect
+            
+            if (results.poseLandmarks) {
+                landmarks = results.poseLandmarks;
+                drawPose(results.poseLandmarks, results);
+                detectKamehamehaPose();
+            }
+            
+            ctx.restore();
+        }
+
+        function drawPose(landmarks, results) {
+            // Draw skeleton
+            drawConnectors(ctx, landmarks, POSE_CONNECTIONS, {
+                color: '#00ffff',
+                lineWidth: 4,
+                alpha: 0.7
+            });
+            
+            // Draw key points with glow
+            drawLandmarks(ctx, landmarks, {
+                color: '#ffff00',
+                lineWidth: 3,
+                radius: 6,
+                alpha: 0.9
+            });
+        }
+
+        function detectKamehamehaPose() {
+            if (!landmarks || landmarks.length === 0) return;
+
+            const leftWrist = landmarks[15];
+            const rightWrist = landmarks[16];
+            const leftShoulder = landmarks[11];
+            const rightShoulder = landmarks[12];
+            const leftElbow = landmarks[13];
+            rightElbow = landmarks[14];
+
+            // Calculate distances (normalized 0-1)
+            const wristDistance = Math.hypot(
+                leftWrist.x - rightWrist.x,
+                leftWrist.y - rightWrist.y
+            );
+
+            const shoulderDistance = Math.hypot(
+                leftShoulder.x - rightShoulder.x,
+                leftShoulder.y - rightShoulder.y
+            );
+
+            const handsTogether = wristDistance < 0.05;
+            const handsCentered = (leftWrist.x + rightWrist.x) / 2 > 0.4 && 
+                                (leftWrist.x + rightWrist.x) / 2 < 0.6;
+            const handsForward = leftWrist.z < -0.1 && rightWrist.z < -0.1;
+            const elbowsBent = Math.abs(leftWrist.y - leftElbow.y) > 0.1 &&
+                             Math.abs(rightWrist.y - rightElbow.y) > 0.1;
+
+            // Kamehameha states
+            if (handsTogether && handsCentered && elbowsBent) {
+                // Charging phase
+                if (!isCharging) {
+                    startCharging();
+                } else {
+                    updateCharging();
+                }
+            } else if (isCharging && powerLevel > 50) {
+                // Fire if power is sufficient
+                fireKamehameha();
+            } else {
+                // Reset
+                if (isCharging) {
+                    stopCharging();
+                }
+            }
+        }
+
+        function startCharging() {
+            isCharging = true;
+            chargeStartTime = Date.now();
+            chargeSound.loop = true;
+            chargeSound.play().catch(e => console.log('Audio play failed'));
+            
+            statusText.textContent = 'CHARGING... KAMEHAMEHA!';
+            statusText.className = 'charging';
+            document.body.classList.add('glow');
+        }
+
+        function updateCharging() {
+            const chargeTime = (Date.now() - chargeStartTime) / 1000;
+            powerLevel = Math.min(100, chargeTime * 25);
+            
+            powerFill.style.width = powerLevel + '%';
+            powerText.textContent = Math.floor(powerLevel) + '%';
+            
+            // Visual effects
+            chargeEffect.style.opacity = Math.min(0.8, powerLevel / 100);
+            auraEffect.style.transform = `translate(-50%, -50%) scale(${powerLevel / 50})`;
+            auraEffect.style.opacity = Math.min(0.6, powerLevel / 100);
+        }
+
+        function stopCharging() {
+            isCharging = false;
+            powerLevel = Math.max(0, powerLevel * 0.9);
+            chargeSound.pause();
+            chargeSound.currentTime = 0;
+            
+            chargeEffect.style.opacity = 0;
+            auraEffect.style.opacity = 0;
+            
+            statusText.textContent = 'Ready to charge...';
+            statusText.className = 'ready';
+            document.body.classList.remove('glow');
+        }
+
+        function fireKamehameha() {
+            isFiring = true;
+            isCharging = false;
+            
+            fireSound.play().catch(e => console.log('Audio play failed'));
+            explosionSound.play().catch(e => console.log('Audio play failed'));
+            
+            statusText.textContent = 'KAMEHAMEHA!!!';
+            statusText.className = 'firing';
+            
+            // Beam effect
+            beamEffect.style.opacity = '1';
+            beamEffect.style.transform = 'scaleX(3)';
+            
+            // Screen shake
+            document.body.style.animation = 'none';
+            setTimeout(() => {
+                document.body.style.transform = 'translate(5px, 5px)';
+            }, 50);
+            setTimeout(() => {
+                document.body.style.transform = 'translate(-5px, -5px)';
+            }, 100);
+            setTimeout(() => {
+                document.body.style.transform = '';
+            }, 200);
+            
+            // Reset after blast
+            setTimeout(() => {
+                beamEffect.style.opacity = '0';
+                beamEffect.style.transform = 'scaleX(0)';
+                powerLevel = 0;
+                powerFill.style.width = '0%';
+                powerText.textContent = '0%';
+                statusText.textContent = 'Kamehameha fired! Ready again...';
+                statusText.className = 'ready';
+                isFiring = false;
+                document.body.classList.remove('glow');
+            }, 1500);
+        }
+
+        // Initialize
+        window.addEventListener('load', async () => {
+            await initCamera();
+            statusText.textContent = 'Pose detected! Ready to charge...';
+            statusText.className = 'ready';
+        });
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopCharging();
+            }
+        });
+
+        // PWA-like fullscreen
+        let fullscreen = false;
+        document.addEventListener('dblclick', () => {
+            if (!fullscreen) {
+                document.documentElement.requestFullscreen();
+                fullscreen = true;
+            }
+        });
+    </script>
+</body>
+</html>
